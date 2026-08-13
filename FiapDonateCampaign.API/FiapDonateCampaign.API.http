@@ -1,0 +1,6 @@
+@FiapDonateCampaign.API_HostAddress = http://localhost:5296
+
+GET {{FiapDonateCampaign.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
