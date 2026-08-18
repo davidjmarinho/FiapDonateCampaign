@@ -13,7 +13,17 @@ Uma plataforma robusta e escalável para gerenciamento de campanhas de doação 
 - [Como Executar](#como-executar)
 - [API Endpoints](#api-endpoints)
 - [Testes](#testes)
+- [Segurança](#segurança)
+- [Padrões de Código](#padrões-de-código)
+- [Regras Aplicadas](#regras-aplicadas-ao-projeto)
+- [Convenções de Nomenclatura](#convenções-de-nomenclatura)
+- [Fluxo de Requisição](#fluxo-de-requisição-típico)
+- [Variáveis de Ambiente](#variáveis-de-ambiente-e-configurações)
+- [Boas Práticas](#boas-práticas-de-desenvolvimento)
+- [Referências](#referências)
 - [Contribuição](#contribuição)
+- [Licença](#licença)
+- [Contato](#contato)
 
 ---
 
@@ -365,10 +375,11 @@ dotnet test
 
 ### Domain-Driven Design (DDD)
 
-- **Entities**: Classes que representam conceitos do negócio
+- **Entities**: Classes que representam conceitos do negócio com lógica de validação integrada
 - **Value Objects**: Objetos imutáveis que representam valores
-- **Repositories**: Padrão para acesso a dados
-- **Services**: Orquestração de lógica de aplicação
+- **Repositories**: Padrão para acesso a dados, implementados na camada de Infrastructure
+- **Services**: Orquestração de lógica de aplicação entre camadas
+- **Domain Exceptions**: Exceções específicas do domínio para regras de negócio violadas
 
 ### SOLID Principles
 
@@ -380,25 +391,301 @@ dotnet test
 
 ---
 
-## 🔧 Variáveis de Ambiente
+## ⚙️ Regras Aplicadas ao Projeto
 
-Configure em `appsettings.json`:
+### 🔐 Arquitetura de Dependências
+
+1. **Inversão de Controle (IoC) via Dependency Injection**
+   - Todas as dependências são registradas no `DependencyInjection.cs` (Infrastructure) e `Program.cs` (API)
+   - Use `AddScoped` para serviços e repositórios (ciclo de vida por requisição)
+   - Injetar sempre via construtor, não via properties
+
+2. **Dois DbContexts para Separação de Responsabilidades**
+   - `AppDbContext`: Gerencia entidades da API (Campaign, Donation) e **propriedade das migrations**
+   - `IdentityStoreDbContext`: Apenas leitura do Identity (usuários e roles) - **sem migrations**
+   - Ambos apontam para o mesmo banco de dados físico
+   - Este padrão previne conflitos de schema entre Identity e entidades de negócio
+
+```csharp
+// Infrastructure/DependencyInjection.cs
+services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
+services.AddDbContext<IdentityStoreDbContext>(options => options.UseSqlServer(connectionString));
+```
+
+### 🎯 Regras de Domínio (Domain-Driven Design)
+
+1. **Lógica de Negócio na Entidade**
+   - Validações críticas devem estar no construtor da entidade ou em métodos de domínio
+   - Use `DomainException` para violações de regra de negócio
+   - Exemplo: `Campaign.ValidarPodeReceberDoacao()` valida estado antes de aceitar doação
+
+```csharp
+// Domain/Entities/Campaign.cs
+public void ValidarPodeReceberDoacao()
+{
+    if (Status == StatusCampaign.Concluida || Status == StatusCampaign.Cancelada)
+        throw new DomainException("Não é possível doar para uma campanha encerrada ou cancelada.");
+}
+```
+
+2. **Propriedades Privadas com Inicialização Controlada**
+   - Apenas getters públicos para propriedades de entidade
+   - Setters privados para controlar mudanças de estado
+   - Sempre que necessário alteração de estado, use métodos específicos (ex: `AdicionarValorArrecadado()`)
+
+```csharp
+public class Campaign
+{
+    public string Titulo { get; private set; }  // ✅ Protegido
+    public decimal ValorArrecadado { get; private set; }  // ✅ Nunca muda via setter
+
+    // ✅ Método específico para adicionar valor
+    public void AdicionarValorArrecadado(decimal valor) { /* ... */ }
+}
+```
+
+3. **Construtor Sem Parâmetros Protegido**
+   - Entity Framework Core requer um construtor sem parâmetros
+   - Marcar como `protected` (nunca `public`) para prevenir instanciação direta
+
+```csharp
+protected Campaign() { } // EF Core requires a parameterless constructor
+```
+
+### 📦 Regras de Repositórios
+
+1. **Interfaces em Domain, Implementações em Infrastructure**
+   - Defina `ICampaignRepository` em `Domain.Interfaces`
+   - Implemente em `Infrastructure.Repositories.CampaignRepository`
+   - Controllers e Services dependem da interface, não da implementação
+
+2. **Métodos Assíncronos Obrigatórios**
+   - Todo acesso a banco de dados deve ser async (I/O não-bloqueante)
+   - Nomenclatura: `GetAsync`, `AddAsync`, `UpdateAsync`, `DeleteAsync`, `GetByIdAsync`, `ListarTodosAsync`
+
+```csharp
+public interface ICampaignRepository
+{
+    Task<Campaign?> ObterPorIdAsync(Guid id);
+    Task<List<Campaign>> ListarTodosAsync();
+    Task AdicionarAsync(Campaign campaign);
+}
+```
+
+### 🛡️ Validação de Dados
+
+1. **FluentValidation para DTOs**
+   - Crie um `*Validator` para cada DTO de entrada
+   - Registre automaticamente via `AddValidatorsFromAssemblyContaining<T>()`
+   - Validação ocorre automaticamente no pipeline (via Action Filter)
+
+```csharp
+public class CampaignRequestValidator : AbstractValidator<CampaignRequestDto>
+{
+    public CampaignRequestValidator()
+    {
+        RuleFor(c => c.Titulo).NotEmpty().MaximumLength(100);
+        RuleFor(c => c.MetaFinanceira).GreaterThan(0);
+    }
+}
+```
+
+2. **Validações de Regra de Negócio no Domínio**
+   - Validações que envolvem lógica complexa devem estar na entidade
+   - DTOs são validados por estrutura e tipos; entidades validam regras
+
+### 🔒 Segurança
+
+1. **JWT Bearer Token com Validação Completa**
+   - Validar: Issuer, Audience, Lifetime, Signing Key
+   - Configuração no `Program.cs` com chave do `appsettings.json`
+
+2. **Identity & Roles**
+   - Use `ApplicationUser` (estende `IdentityUser`) para usuários da app
+   - Roles pré-definidos seeded no `RoleSeeder`
+   - Exemplo: Admin, User
+
+3. **HTTPS Obrigatório em Produção**
+   - Redirecionar HTTP → HTTPS
+   - Usar `UseHttpsRedirection()` no pipeline
+
+### 🎛️ Exceções
+
+1. **DomainException para Negócio**
+   - Use quando regra de negócio for violada
+   - Exemplo: Tentativa de doar para campanha cancelada
+
+2. **Middleware Global de Exceção**
+   - `ExceptionMiddleware` centraliza tratamento
+   - Mapeia exceções para respostas HTTP apropriadas
+   - Registre via `app.UseMiddleware<ExceptionMiddleware>()`
+
+```csharp
+try
+{
+    var campanha = await _campanhaRepository.ObterPorIdAsync(id)
+        ?? throw new DomainException("Campanha não encontrada.");
+    campanha.ValidarPodeReceberDoacao(); // Pode lançar DomainException
+}
+catch (DomainException ex)
+{
+    // Middleware converte para 400 Bad Request
+}
+```
+
+### 📡 Controllers
+
+1. **Controllers devem ser Thin (Finos)**
+   - Apenas recebem requisição, chamam serviço, retornam resposta
+   - Nenhuma lógica de negócio diretamente no controller
+
+2. **Injetar Interface do Serviço**
+   - Dependência do serviço apenas, não da implementação
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+public class CampaignController : ControllerBase
+{
+    private readonly ICampaignService _service;
+
+    public CampaignController(ICampaignService service) => _service = service;
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CampaignRequestDto dto)
+    {
+        var resultado = await _service.CriarAsync(dto);
+        return CreatedAtAction(nameof(GetById), new { id = resultado.Id }, resultado);
+    }
+}
+```
+
+### 🧪 Testes
+
+1. **Unit Tests**: Testes de lógica de domínio e serviços isolados
+2. **Integration Tests**: Testes da API completa com banco in-memory ou real
+
+### 📝 DTOs
+
+1. **DTOs Separados por Operação**
+   - `CampaignRequestDto`: Entrada de dados (POST/PUT)
+   - `CampaignResponseDto`: Saída de dados (GET)
+   - Previne exposição excessiva de informações
+
+2. **Mapeamento Manual ou AutoMapper**
+   - Atualmente sem AutoMapper; considere adicionar para escalar
+   - Ex: `new CampaignResponseDto { Id = campaign.Id, ... }`
+
+---
+
+## 📋 Convenções de Nomenclatura
+
+| Elemento | Convenção | Exemplo |
+|----------|-----------|---------|
+| **Namespaces** | PascalCase com pontos | `FiapDonateCampaign.Domain.Entities` |
+| **Classes** | PascalCase | `Campaign`, `CampaignService`, `CampaignValidator` |
+| **Interfaces** | I + PascalCase | `ICampaignRepository`, `ICampaignService` |
+| **Métodos** | PascalCase + Async suffix | `GetByIdAsync`, `CreateAsync` |
+| **Propriedades** | PascalCase | `Id`, `Titulo`, `Status` |
+| **Campos privados** | _camelCase | `_repository`, `_logger` |
+| **Enums** | PascalCase | `StatusCampaign`, `UserRole` |
+| **Constants** | UPPER_SNAKE_CASE | `MAX_CAMPAIGN_TITLE_LENGTH` |
+
+---
+
+## 🔄 Fluxo de Requisição Típico
+
+```
+1. [HTTP Request] → CampaignController
+2. CampaignController → FluentValidator (automático)
+3. CampaignController → ICampaignService
+4. CampaignService → ICampaignRepository
+5. CampaignRepository → AppDbContext → SQL Server
+6. [Domain Validation] → Campaign Entity (lança DomainException se necessário)
+7. ExceptionMiddleware → [HTTP Response] ✅ ou ❌
+```
+
+---
+
+## 🔧 Variáveis de Ambiente e Configurações
+
+Configure em `appsettings.json` (raiz da pasta FiapDonateCampaign.API):
 
 ```json
 {
   "ConnectionStrings": {
-	"DefaultConnection": "Sua string de conexão"
+	"DefaultConnection": "Server=YOUR_SERVER;Database=FiapDonateCampaignDb;Trusted_Connection=true;"
   },
   "Jwt": {
-	"Key": "Sua chave JWT secreta (mínimo 32 caracteres)",
-	"Issuer": "Seu issuer",
-	"Audience": "Seu audience"
+	"Key": "sua-chave-secreta-super-longa-com-minimo-32-caracteres",
+	"Issuer": "FiapDonate",
+	"Audience": "FiapDonateUsers"
   },
   "Logging": {
 	"LogLevel": {
-	  "Default": "Information"
+	  "Default": "Information",
+	  "Microsoft.EntityFrameworkCore": "Warning"
 	}
   }
+}
+```
+
+### 📌 Regras de Configuração
+
+1. **Connection String**
+   - Deve apontar para um SQL Server válido
+   - Usar `Trusted_Connection=true` para Windows Authentication (desenvolvimento)
+   - Usar user/password em produção com variáveis de ambiente
+
+2. **JWT Key**
+   - **Mínimo de 32 caracteres** (256 bits para HS256)
+   - **NUNCA commitar** chaves reais no repositório
+   - Use environment variables ou Azure Key Vault em produção
+
+3. **Environments**
+   - `Development`: `appsettings.Development.json` (valores de teste)
+   - `Production`: Use variáveis de ambiente do servidor
+
+---
+
+## ✅ Boas Práticas de Desenvolvimento
+
+1. **Sempre use async/await** em operações de I/O
+2. **Valide entrada de dados** com FluentValidation
+3. **Lance DomainException** para regras de negócio violadas
+4. **Não coloque lógica no controller** - use services
+5. **Interfaces para toda abstração** que será injetada
+6. **Testes para lógica crítica** de domínio
+7. **Commit mensagens em inglês** ou português claro
+8. **Code review antes de merge** para main/production
+
+### 🚫 Anti-padrões a Evitar
+
+```csharp
+// ❌ ERRADO: Serviço instanciado
+var service = new CampaignService(repo); 
+
+// ✅ CORRETO: Injetado via DI
+public CampaignController(ICampaignService service) => _service = service;
+
+// ❌ ERRADO: Setter público em entidade
+public class Campaign { public string Titulo { get; set; } }
+
+// ✅ CORRETO: Setter privado
+public class Campaign { public string Titulo { get; private set; } }
+
+// ❌ ERRADO: Lógica de negócio no controller
+[HttpPost]
+public async Task<IActionResult> Create(CampaignRequestDto dto)
+{
+	if (dto.MetaFinanceira <= 0) return BadRequest(); // LÓGICA NO CONTROLLER!
+}
+
+// ✅ CORRETO: Validação no DTO + lógica na entidade
+[HttpPost]
+public async Task<IActionResult> Create(CampaignRequestDto dto)
+{
+	var resultado = await _service.CriarAsync(dto); // Service orquestra
 }
 ```
 
@@ -438,5 +725,6 @@ Este projeto está sob licença MIT. Veja o arquivo `LICENSE` para mais detalhes
 ---
 
 **Última Atualização**: Janeiro 2025  
-**Versão**: 1.0.0  
-**Status**: Em Desenvolvimento
+**Versão**: 1.0.1  
+**Status**: Em Desenvolvimento  
+**Nova Seção**: ✅ Regras Aplicadas ao Projeto
