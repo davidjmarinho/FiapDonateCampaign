@@ -7,5 +7,6 @@ namespace FiapDonateCampaign.Application.Interface
         Task<CampaignResponseDto> CriarAsync(CampaignRequestDto dto);
         Task<CampaignResponseDto> AtualizarAsync(Guid id, CampaignRequestDto dto);
         Task<CampaignResponseDto?> ObterPorIdAsync(Guid id);
+        Task<IEnumerable<CampaignListDto>> ListarAtivasAsync();
     }
 }

@@ -11,6 +11,7 @@ namespace FiapDonateCampaign.Domain.Entities
         public DateTime DataInicio { get; private set; }
         public DateTime DataFim { get; private set; }
         public decimal MetaFinanceira { get; private set; }
+        public decimal ValorArrecadado { get; private set; }
         public StatusCampaign Status { get; private set; }
 
         protected Campaign() { } //EF Core requires a parameterless 
@@ -25,6 +26,7 @@ namespace FiapDonateCampaign.Domain.Entities
             DataInicio = dataInicio;
             DataFim = dataFim;
             MetaFinanceira = metaFinanceira;
+            ValorArrecadado = 0;
             Status = StatusCampaign.Ativa;
 
         }
@@ -37,6 +39,25 @@ namespace FiapDonateCampaign.Domain.Entities
             if (metaFinanceira <= 0)
                 throw new DomainException("A meta financeira deve ser maior que zero.");
         }
+
+        public void ValidarPodeReceberDoacao()
+        {
+            if (Status == StatusCampaign.Concluida || Status == StatusCampaign.Cancelada)
+                throw new DomainException("Não é possível doar para uma campanha encerrada ou cancelada.");
+        }
+
+        // só deve mudar através de uma doação confirmada, nunca por edição manual.
+        public void AdicionarValorArrecadado(decimal valor)
+        {
+            if (valor <= 0)
+                throw new DomainException("O valor da doação deve ser maior que zero.");
+
+            ValorArrecadado += valor;
+
+            if (ValorArrecadado >= MetaFinanceira && Status == StatusCampaign.Ativa)
+                Status = StatusCampaign.Concluida;
+        }
+
 
         public void Atualizar(string titulo, string descricao, DateTime dataInicio, DateTime dataFim, decimal metaFinanceira, StatusCampaign status)
         {

@@ -9,6 +9,7 @@ namespace FiapDonateCampaign.Application.DTOs
     DateTime DataInicio,
     DateTime DataFim,
     decimal MetaFinanceira,
+    decimal ValorArrecadado,
     StatusCampaign Status);
 
 }

@@ -22,6 +22,7 @@ namespace FiapDonateCampaign.Infrastructure.Auth
             var claims = new List<Claim>
             {
                 new(JwtRegisteredClaimNames.Sub, usuario.Id),
+                new(ClaimTypes.NameIdentifier, usuario.Id),
                 new(JwtRegisteredClaimNames.Email, usuario.Email ?? string.Empty),
                 new("nome", usuario.Nome),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())

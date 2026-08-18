@@ -1,5 +1,4 @@
-﻿
-using FiapDonateCampaign.Application.DTOs;
+﻿using FiapDonateCampaign.Application.DTOs;
 using FiapDonateCampaign.Application.Interface;
 using FiapDonateCampaign.Domain.Entities;
 using FiapDonateCampaign.Domain.Exceptions;
@@ -35,7 +34,14 @@ namespace FiapDonateCampaign.Application.Services
             return campaign is null ? null : ToDto(campaign);
         }
 
+        public async Task<IEnumerable<CampaignListDto>> ListarAtivasAsync()
+        {
+            var campanhas = await _repository.ObterAtivasAsync();
+
+            return campanhas.Select(c => new CampaignListDto(c.Titulo, c.MetaFinanceira, c.ValorArrecadado));
+        }
+
         private static CampaignResponseDto ToDto(Campaign c) =>
-            new(c.Id, c.Titulo, c.Descricao, c.DataInicio, c.DataFim, c.MetaFinanceira, c.Status);
+            new(c.Id, c.Titulo, c.Descricao, c.DataInicio, c.DataFim, c.MetaFinanceira, c.ValorArrecadado, c.Status);
     }
 }

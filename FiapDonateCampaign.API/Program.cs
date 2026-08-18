@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Camadas ---
 builder.Services.AddInfrastructure(builder.Configuration); // banco, Identity, repositórios, TokenService
 builder.Services.AddScoped<ICampaignService, CampaignService>();
+builder.Services.AddScoped<IDonationService, DonationService>();
 
 // --- Validação automática dos DTOs recebidos ---
 builder.Services.AddValidatorsFromAssemblyContaining<CampaignRequestValidator>();
@@ -75,13 +76,6 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
-
-// --- Seed das Roles no startup ---
-using (var scope = app.Services.CreateScope())
-{
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    await RoleSeeder.SeedAsync(roleManager);
-}
 
 if (app.Environment.IsDevelopment())
 {

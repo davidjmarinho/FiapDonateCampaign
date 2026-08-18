@@ -14,7 +14,7 @@ public class CampaignController : ControllerBase
     public CampaignController(ICampaignService service) => _service = service;
 
     [HttpPost]
-    [Authorize(Roles = "GestorOng")] // sobrescreve: só GestorOng pode criar
+    [Authorize(Roles = "GestorONG")] // sobrescreve: só GestorOng pode criar
     public async Task<IActionResult> Criar(CampaignRequestDto dto)
     {
         var resultado = await _service.CriarAsync(dto);
@@ -22,10 +22,17 @@ public class CampaignController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "GestorOng")] // só GestorOng pode editar
+    [Authorize(Roles = "GestorONG")] // só GestorOng pode editar
     public async Task<IActionResult> Editar(Guid id, CampaignRequestDto dto)
     {
         var resultado = await _service.AtualizarAsync(id, dto);
+        return Ok(resultado);
+    }
+
+    [HttpGet("ativas")]
+    public async Task<IActionResult> ListarAtivas() // sem [Authorize(Roles=...)] extra: qualquer usuário logado (GestorONG ou Doador) pode ver
+    {
+        var resultado = await _service.ListarAtivasAsync();
         return Ok(resultado);
     }
 

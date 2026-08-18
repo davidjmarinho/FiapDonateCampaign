@@ -2,6 +2,7 @@
 using FiapDonateCampaign.Domain.Entities;
 using FiapDonateCampaign.Domain.Interfaces;
 using FiapDonateCampaign.Infrastructure.Data;
+using FiapDonateCampaign.Domain.Enums;
 
 namespace FiapDonateCampaign.Infrastructure.Repositories;
 
@@ -24,4 +25,10 @@ public class CampaignRepository : ICampaignRepository
 
     public Task<Campaign?> ObterPorIdAsync(Guid id) =>
         _context.Campaigns.FirstOrDefaultAsync(c => c.Id == id);
+
+    public async Task<IEnumerable<Campaign>> ObterAtivasAsync() =>
+    await _context.Campaigns
+        .Where(c => c.Status == StatusCampaign.Ativa)
+        .AsNoTracking() // é uma consulta só de leitura, não precisa rastrear as entidades — mais rápido
+        .ToListAsync();
 }

@@ -5,7 +5,6 @@ using FiapDonateCampaign.Infrastructure.Identity;
 
 namespace FiapDonateCampaign.API.Controllers;
 
-public record RegisterDto(string Nome, string Email, string Senha, string Role); // Role: "GestorOng" ou "Doador"
 public record LoginDto(string Email, string Senha);
 
 [ApiController]
@@ -19,23 +18,6 @@ public class AuthController : ControllerBase
     {
         _userManager = userManager;
         _tokenService = tokenService;
-    }
-
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterDto dto)
-    {
-        if (dto.Role != "GestorOng" && dto.Role != "Doador")
-            return BadRequest("Role inválida. Use 'GestorOng' ou 'Doador'.");
-
-        var usuario = new ApplicationUser { UserName = dto.Email, Email = dto.Email, Nome = dto.Nome };
-        var resultado = await _userManager.CreateAsync(usuario, dto.Senha);
-
-        if (!resultado.Succeeded)
-            return BadRequest(resultado.Errors);
-
-        await _userManager.AddToRoleAsync(usuario, dto.Role);
-
-        return Ok(new { mensagem = "Usuário registrado com sucesso." });
     }
 
     [HttpPost("login")]
