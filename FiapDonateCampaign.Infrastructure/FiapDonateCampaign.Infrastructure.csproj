@@ -26,4 +26,8 @@
     <ProjectReference Include="..\FiapDonateCampaign.Domain\FiapDonateCampaign.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Messaging\Events\" />
+  </ItemGroup>
+
 </Project>

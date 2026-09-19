@@ -33,7 +33,13 @@ public class DonationService : IDonationService
         var doacao = new Donation(dto.IdCampanha, doadorId, dto.ValorDoacao);
         await _doacaoRepository.AdicionarAsync(doacao);
 
-        var evento = new DonationReceivedEvent(doacao.Id, doacao.CampanhaId, doacao.DoadorId, doacao.ValorDoacao, doacao.DataDoacao);
+        // Criar evento de doação recebida para publicar no RabbitMQ
+        var evento = new DoacaoRecebidaEvent(
+            DoacaoId: doacao.Id,
+            IdCampanha: doacao.CampanhaId,
+            ValorDoacao: doacao.ValorDoacao,
+            DataHoraRecebida: doacao.DataDoacao);
+
         await _eventPublisher.PublishAsync(evento, "campanha.doacao.recebida");
 
         return new IntentionDonateResponseDto(doacao.Id, doacao.CampanhaId, doacao.ValorDoacao, doacao.DataDoacao);
