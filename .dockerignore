@@ -1,0 +1,12 @@
+.git
+.github
+.vs
+.vscode
+**/bin
+**/obj
+**/.DS_Store
+.env
+docker-compose.override.yml
+k8s/secret.yaml
+TestResults
+coverage

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="FiapDonateCampaign.API/FiapDonateCampaign.API.csproj" />
+    <Project Path="FiapDonateCampaign.Application/FiapDonateCampaign.Application.csproj" />
+    <Project Path="FiapDonateCampaign.Domain/FiapDonateCampaign.Domain.csproj" />
+    <Project Path="FiapDonateCampaign.Infrastructure/FiapDonateCampaign.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="FiapDonateCampaign.IntegrationTests/FiapDonateCampaign.IntegrationTests.csproj" />
+    <Project Path="FiapDonateCampaign.UnitTests/FiapDonateCampaign.UnitTests.csproj" />
+  </Folder>
+</Solution>

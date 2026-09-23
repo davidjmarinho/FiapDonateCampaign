@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fiapdonatecampaign
+  labels:
+    app: fiapdonatecampaign
+spec:
+  type: ClusterIP
+  selector:
+    app: fiapdonatecampaign
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
