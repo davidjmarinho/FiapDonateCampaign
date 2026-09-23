@@ -13,6 +13,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Permite que Docker Secrets montados em /run/secrets sobrescrevam appsettings
+// e variáveis de ambiente. Arquivos como Jwt__Key e
+// ConnectionStrings__DefaultConnection são mapeados para chaves .NET.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 // --- Camadas ---
 builder.Services.AddInfrastructure(builder.Configuration); // banco, Identity, repositórios, TokenService
 builder.Services.AddScoped<ICampaignService, CampaignService>();

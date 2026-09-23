@@ -45,6 +45,8 @@ A API usa as seguintes chaves de configuração:
 
 Em desenvolvimento, o arquivo [FiapDonateCampaign.API/appsettings.json](FiapDonateCampaign.API/appsettings.json) contém valores locais. Para ambientes compartilhados, use variáveis de ambiente ou Secrets; não versione credenciais reais.
 
+Em execução Docker integrada, a API também aceita Docker Secrets montados em `/run/secrets`. Os nomes dos arquivos devem ser `ConnectionStrings__DefaultConnection` e `Jwt__Key`. Essa fonte tem precedência sobre `appsettings` e variáveis de ambiente.
+
 Exemplo de connection string para SQL Server em container:
 
 ```text
