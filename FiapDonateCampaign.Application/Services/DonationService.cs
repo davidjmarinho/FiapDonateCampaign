@@ -1,9 +1,9 @@
 ﻿using FiapDonateCampaign.Application.DTOs;
-using FiapDonateCampaign.Application.Event;
 using FiapDonateCampaign.Application.Interface;
 using FiapDonateCampaign.Domain.Entities;
 using FiapDonateCampaign.Domain.Exceptions;
 using FiapDonateCampaign.Domain.Interfaces;
+using FiapDonateWorker.Api.Events; // contrato compartilhado com o Worker - ver comentário em DoacaoRecebidaEvent.cs
 
 namespace FiapDonateCampaign.Application.Services;
 

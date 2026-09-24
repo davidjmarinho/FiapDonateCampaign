@@ -1,3 +1,4 @@
+using FiapDonateCampaign.API.Consumers;
 using FiapDonateCampaign.API.Middlewares;
 using FiapDonateCampaign.Application.Interface;
 using FiapDonateCampaign.Application.Services;
@@ -5,6 +6,7 @@ using FiapDonateCampaign.Application.Validators;
 using FiapDonateCampaign.Infrastructure;
 using FiapDonateCampaign.Infrastructure.Identity;
 using FluentValidation;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
@@ -51,6 +53,34 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+// --- RabbitMQ / MassTransit ---
+// Publica DoacaoRecebidaEvent (consumido pelo Worker) e consome
+// ValorArrecadadoAtualizadoEvent (publicado pelo Worker após creditar uma doação).
+var rabbitHost = builder.Configuration["RabbitMq:Host"] ?? "localhost";
+var rabbitVirtualHost = builder.Configuration["RabbitMq:VirtualHost"] ?? "/";
+var rabbitUsername = builder.Configuration["RabbitMq:Username"] ?? "guest";
+var rabbitPassword = builder.Configuration["RabbitMq:Password"] ?? "guest";
+
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<ValorArrecadadoAtualizadoConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(rabbitHost, rabbitVirtualHost, h =>
+        {
+            h.Username(rabbitUsername);
+            h.Password(rabbitPassword);
+        });
+
+        cfg.ReceiveEndpoint("valor-arrecadado-atualizado-queue", e =>
+        {
+            e.ConfigureConsumer<ValorArrecadadoAtualizadoConsumer>(context);
+            e.UseMessageRetry(r => r.Immediate(3));
+        });
+    });
+});
 
 // --- Swagger com suporte a Bearer token ---
 builder.Services.AddEndpointsApiExplorer();

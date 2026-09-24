@@ -58,6 +58,21 @@ namespace FiapDonateCampaign.Domain.Entities
                 Status = StatusCampaign.Concluida;
         }
 
+        // Usado pelo consumer do evento ValorArrecadadoAtualizadoEvent (publicado pelo
+        // Worker após creditar uma doação): recebe o total absoluto já calculado pelo
+        // Worker, em vez de um delta - reentregas da mesma mensagem reafirmam o mesmo
+        // total sem somar duas vezes.
+        public void DefinirValorArrecadado(decimal valorArrecadado)
+        {
+            if (valorArrecadado < 0)
+                throw new DomainException("O valor arrecadado não pode ser negativo.");
+
+            ValorArrecadado = valorArrecadado;
+
+            if (ValorArrecadado >= MetaFinanceira && Status == StatusCampaign.Ativa)
+                Status = StatusCampaign.Concluida;
+        }
+
 
         public void Atualizar(string titulo, string descricao, DateTime dataInicio, DateTime dataFim, decimal metaFinanceira, StatusCampaign status)
         {

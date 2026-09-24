@@ -7,3 +7,7 @@ data:
   ASPNETCORE_URLS: http://+:8080
   Jwt__Issuer: FiapDonateCampaign
   Jwt__Audience: FiapDonateCampaignUsers
+  RabbitMq__Host: rabbitmq
+  RabbitMq__VirtualHost: /
+  RabbitMq__Username: guest
+  RabbitMq__Password: guest
