@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using FiapDonateCampaign.Application.DTOs;
 using FiapDonateCampaign.Application.Interface;
@@ -30,7 +30,8 @@ public class CampaignController : ControllerBase
     }
 
     [HttpGet("ativas")]
-    public async Task<IActionResult> ListarAtivas() // sem [Authorize(Roles=...)] extra: qualquer usuário logado (GestorONG ou Doador) pode ver
+    [AllowAnonymous] // Painel de Transparência: acesso público, exigido pelo enunciado
+    public async Task<IActionResult> ListarAtivas()
     {
         var resultado = await _service.ListarAtivasAsync();
         return Ok(resultado);
