@@ -1,4 +1,5 @@
 using FiapDonateCampaign.API.Consumers;
+using FiapDonateCampaign.API.HealthChecks;
 using FiapDonateCampaign.API.Middlewares;
 using FiapDonateCampaign.Application.Interface;
 using FiapDonateCampaign.Application.Services;
@@ -8,10 +9,14 @@ using FiapDonateCampaign.Infrastructure.Identity;
 using FluentValidation;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Prometheus;
 using System.Text;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +35,12 @@ builder.Services.AddValidatorsFromAssemblyContaining<CampaignRequestValidator>()
 
 // --- Controllers ---
 builder.Services.AddControllers();
+
+// --- Health checks ---
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "live" })
+    .AddCheck<SqlServerHealthCheck>("sqlserver", tags: new[] { "ready" })
+    .AddCheck<RabbitMqHealthCheck>("rabbitmq", tags: new[] { "ready" });
 
 // --- JWT Authentication ---
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -120,9 +131,53 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<ExceptionMiddleware>();
 
+app.UseHttpMetrics();
+
 app.UseAuthentication(); // sempre ANTES do UseAuthorization
 app.UseAuthorization();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live"),
+    ResponseWriter = WriteHealthResponse
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponse
+});
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponse
+});
+
+app.MapMetrics("/metrics");
 
 app.MapControllers();
 
 app.Run();
+
+static Task WriteHealthResponse(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+
+    var payload = new
+    {
+        status = report.Status.ToString(),
+        totalDuration = report.TotalDuration.TotalMilliseconds,
+        entries = report.Entries.ToDictionary(
+            entry => entry.Key,
+            entry => new
+            {
+                status = entry.Value.Status.ToString(),
+                description = entry.Value.Description,
+                duration = entry.Value.Duration.TotalMilliseconds,
+                data = entry.Value.Data
+            })
+    };
+
+    return context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+}

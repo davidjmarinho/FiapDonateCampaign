@@ -187,7 +187,7 @@ kubectl apply -f k8s/configmap.yaml -f k8s/secret.yaml -f k8s/deployment.yaml -f
 
 A comunicação interna com a API ocorre por `http://fiapdonatecampaign:8080`.
 
-A API não expõe endpoints de health check ou métricas no estado atual. Por isso, as probes do Deployment são TCP na porta `8080`; elas não verificam a disponibilidade do SQL Server. Quando os endpoints HTTP de health forem implementados, as probes devem ser atualizadas.
+A API expõe `/health/live`, `/health/ready`, `/health` e `/metrics`. O Kubernetes já pode usar probes HTTP em `/health/live` e `/health/ready`.
 
 ## Testes e validação
 
@@ -219,4 +219,5 @@ O guia operacional para o repositório central de infraestrutura está em [docs/
 - A publicação de `DoacaoRecebidaEvent` e o consumo de `ValorArrecadadoAtualizadoEvent` já são reais (MassTransit + RabbitMQ), fechando o fluxo assíncrono com o Worker.
 - A aplicação depende do schema e dos usuários provisionados pelo serviço proprietário do Identity.
 - Migrations precisam ser executadas externamente.
-- Health checks e métricas Prometheus ainda precisam ser implementados (o Worker já os expõe; a API ainda não).
+- A API já expõe health checks HTTP e `/metrics` para observabilidade.
+- Health checks e métricas agora estão implementados.
