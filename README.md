@@ -42,6 +42,9 @@ A API usa as seguintes chaves de configuração:
 | `Jwt__Key` | Chave de assinatura JWT. Deve ser secreta e ter ao menos 32 caracteres. |
 | `Jwt__Issuer` | Emissor esperado do token. |
 | `Jwt__Audience` | Audiência esperada do token. |
+| `RabbitMq__Host` | Host do broker RabbitMQ (compartilhado com o Worker). |
+| `RabbitMq__VirtualHost` | Virtual host do RabbitMQ (padrão `/`). |
+| `RabbitMq__Username` / `RabbitMq__Password` | Credenciais do RabbitMQ. |
 
 Em desenvolvimento, o arquivo [FiapDonateCampaign.API/appsettings.json](FiapDonateCampaign.API/appsettings.json) contém valores locais. Para ambientes compartilhados, use variáveis de ambiente ou Secrets; não versione credenciais reais.
 
@@ -150,16 +153,17 @@ A campanha precisa estar apta a receber doações. O identificador do doador é 
 
 ## Mensageria
 
-O caso de uso de doação cria um `DoacaoRecebidaEvent`. Porém, a implementação de `IEventPublisher` atualmente registrada é `LogEventPublisher`, que apenas registra a publicação em log.
+O caso de uso de doação (`DonationService.RegistrarIntencaoAsync`) **não** atualiza `ValorArrecadado` diretamente: ele publica `DoacaoRecebidaEvent` no RabbitMQ via `MassTransitEventPublisher` (implementação real de `IEventPublisher`, usando `IPublishEndpoint` do MassTransit).
 
-A integração RabbitMQ ainda não está operacional neste projeto:
+Arquitetura database-per-service: esta API e o repositório `FiapDonateWorker` têm cada um o seu próprio banco (a tabela `Campaigns` não é compartilhada). A integração é feita **100% por eventos**:
 
-- `RabbitMqEventPublisher` é apenas um scaffold;
-- não há configuração RabbitMQ consumida pela aplicação;
-- RabbitMQ não faz parte do [docker-compose.yml](docker-compose.yml) nem dos manifests Kubernetes;
-- uma intenção de doação ainda não é entregue ao Worker por mensageria.
+1. Esta API publica `DoacaoRecebidaEvent` (só para campanhas ativas — a validação de atividade acontece no intake, antes de publicar).
+2. O Worker consome o evento, credita o valor no seu próprio banco (`conexao_solidaria`) e publica de volta `ValorArrecadadoAtualizadoEvent`.
+3. Esta API consome esse evento (`ValorArrecadadoAtualizadoConsumer`) e atualiza `Campaigns.ValorArrecadado` com o valor absoluto recebido — é esse valor que o Painel de Transparência (`GET /api/campaign/ativas`) expõe.
 
-O contrato planejado e a pendência de integração estão documentados em [docs/worker-receiver-integration.md](docs/worker-receiver-integration.md).
+> **Contrato entre repositórios:** os tipos `DoacaoRecebidaEvent` e `ValorArrecadadoAtualizadoEvent` desta API têm o namespace `FiapDonateWorker.Api.Events` — igual ao do repositório `FiapDonateWorker` — de propósito. O MassTransit roteia mensagens pela identidade do tipo CLR (namespace + nome); como os dois serviços estão em repositórios distintos sem um pacote de contratos compartilhado, o namespace precisa ser idêntico nos dois lados para a mensagem chegar à fila correta. Veja os comentários em `FiapDonateCampaign.Application/Event/DoacaoRecebidaEvent.cs` e `FiapDonateCampaign.API/Events/ValorArrecadadoAtualizadoEvent.cs`.
+
+A configuração do RabbitMQ é lida de `RabbitMq:Host`/`VirtualHost`/`Username`/`Password` (`appsettings`, variáveis de ambiente ou `RabbitMq__*` no Compose/Kubernetes).
 
 ## Kubernetes
 
@@ -211,7 +215,8 @@ O guia operacional para o repositório central de infraestrutura está em [docs/
 
 ## Estado atual e pendências
 
-- O SQL Server e o JWT já podem ser configurados por variáveis de ambiente, Compose e Secret Kubernetes.
+- O SQL Server, o RabbitMQ e o JWT já podem ser configurados por variáveis de ambiente, Compose e ConfigMap/Secret Kubernetes.
+- A publicação de `DoacaoRecebidaEvent` e o consumo de `ValorArrecadadoAtualizadoEvent` já são reais (MassTransit + RabbitMQ), fechando o fluxo assíncrono com o Worker.
 - A aplicação depende do schema e dos usuários provisionados pelo serviço proprietário do Identity.
 - Migrations precisam ser executadas externamente.
-- Health checks, métricas Prometheus e publicação real no RabbitMQ ainda precisam ser implementados.
+- Health checks e métricas Prometheus ainda precisam ser implementados (o Worker já os expõe; a API ainda não).

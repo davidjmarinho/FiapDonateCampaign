@@ -35,7 +35,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<ICampaignRepository, CampaignRepository>();
         services.AddScoped<IDonationRepository, DonationRepository>();
-        services.AddScoped<IEventPublisher, LogEventPublisher>();
+        services.AddScoped<IEventPublisher, MassTransitEventPublisher>();
 
         return services;
     }
