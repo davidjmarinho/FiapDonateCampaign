@@ -10,4 +10,3 @@ data:
   RabbitMq__Host: rabbitmq
   RabbitMq__VirtualHost: /
   RabbitMq__Username: guest
-  RabbitMq__Password: guest
